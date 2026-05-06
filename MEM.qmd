@@ -1,7 +1,12 @@
 ---
 title: "Mixed Effects Models"
-author: "James Crosbie"
-date: Sys.Date()
+author: 
+  - name: "James Crosbie"
+date: today
+date-format: "YYYY-MM-DD"
+page-footer:
+  border: true
+title-block-banner: true
 format: 
   html: 
     code-fold: true
