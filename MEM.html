@@ -7,6 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="James Crosbie">
+<meta name="dcterms.date" content="2026-05-06">
 
 <title>Mixed Effects Models</title>
 <style>
@@ -34,10 +35,10 @@ ul.task-list li input[type="checkbox"] {
 <script src="MEM_files/libs/quarto-html/tippy.umd.min.js"></script>
 <script src="MEM_files/libs/quarto-html/anchor.min.js"></script>
 <link href="MEM_files/libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="MEM_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="MEM_files/libs/quarto-html/quarto-syntax-highlighting-dark-d0ae9245876894da5ac7e18953ecc5cc.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="MEM_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href="MEM_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="MEM_files/libs/bootstrap/bootstrap-efbb37e9afcc02144ebbc7afd12a776f.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="MEM_files/libs/bootstrap/bootstrap-e85ed4795480e4daa977ab9e590fc90c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="dark">
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -73,7 +74,35 @@ window.Quarto = {
 
 <body class="quarto-light">
 
-<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Mixed Effects Models</h1>
+                      </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>James Crosbie </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">2026-05-06</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
 <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
   <nav id="TOC" role="doc-toc" class="toc-active">
     <h2 id="toc-title">Table of contents</h2>
@@ -84,41 +113,13 @@ window.Quarto = {
   <li><a href="#fixed-effects" id="toc-fixed-effects" class="nav-link" data-scroll-target="#fixed-effects">Fixed Effects</a></li>
   <li><a href="#random-effects" id="toc-random-effects" class="nav-link" data-scroll-target="#random-effects">Random Effects</a></li>
   </ul></li>
-  <li><a href="#useful" id="toc-useful" class="nav-link" data-scroll-target="#useful">Useful</a></li>
   </ul>
 </nav>
 </div>
-<main class="content" id="quarto-document-content">
-
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">Mixed Effects Models</h1>
-</div>
+<main class="content quarto-banner-title-block" id="quarto-document-content">
 
 
 
-<div class="quarto-title-meta">
-
-    <div>
-    <div class="quarto-title-meta-heading">Author</div>
-    <div class="quarto-title-meta-contents">
-             <p>James Crosbie </p>
-          </div>
-  </div>
-    
-    <div>
-    <div class="quarto-title-meta-heading">Published</div>
-    <div class="quarto-title-meta-contents">
-      <p class="date">Invalid Date</p>
-    </div>
-  </div>
-  
-    
-  </div>
-  
-
-
-</header>
 
 
 <section id="introduction" class="level2">
@@ -146,12 +147,6 @@ window.Quarto = {
 <p>Could the differences be down to the way different nurses measure blood pressure? Because this is an effect we aren’t interested in, we can treat it as a <strong>random effect</strong>. This allows us to account for the variability between nurses without having to estimate a separate parameter for each nurse (which would be a fixed effect). We can use a mixed effects model to account for both the fixed effect of group (smoker vs non-smoker) and the random effect of nurse.</p>
 <p><strong>However!</strong> In the later example it is not possible to distinguish between the effect of group and the nurse because they are confounded. This is a <strong>fatal</strong> issue with the design of the study.</p>
 </section>
-</section>
-<section id="useful" class="level2">
-<h2 class="anchored" data-anchor-id="useful">Useful</h2>
-<ul>
-<li><a href="https://www.youtube.com/watch?v=5tOifM51ZOk&amp;list=WL&amp;index=93&amp;pp=iAQBsAgC">Simplistics</a></li>
-</ul>
 </section>
 
 </main>
