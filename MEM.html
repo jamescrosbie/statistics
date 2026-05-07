@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="James Crosbie">
-<meta name="dcterms.date" content="2026-05-06">
+<meta name="dcterms.date" content="2026-05-07">
 
 <title>Mixed Effects Models</title>
 <style>
@@ -94,7 +94,7 @@ window.Quarto = {
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">2026-05-06</p>
+        <p class="date">2026-05-07</p>
       </div>
     </div>
     
@@ -113,6 +113,8 @@ window.Quarto = {
   <li><a href="#fixed-effects" id="toc-fixed-effects" class="nav-link" data-scroll-target="#fixed-effects">Fixed Effects</a></li>
   <li><a href="#random-effects" id="toc-random-effects" class="nav-link" data-scroll-target="#random-effects">Random Effects</a></li>
   </ul></li>
+  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
+  <li><a href="#choice-of-random-effects-models" id="toc-choice-of-random-effects-models" class="nav-link" data-scroll-target="#choice-of-random-effects-models">Choice of Random Effects Models</a></li>
   </ul>
 </nav>
 </div>
@@ -147,6 +149,78 @@ window.Quarto = {
 <p>Could the differences be down to the way different nurses measure blood pressure? Because this is an effect we aren’t interested in, we can treat it as a <strong>random effect</strong>. This allows us to account for the variability between nurses without having to estimate a separate parameter for each nurse (which would be a fixed effect). We can use a mixed effects model to account for both the fixed effect of group (smoker vs non-smoker) and the random effect of nurse.</p>
 <p><strong>However!</strong> In the later example it is not possible to distinguish between the effect of group and the nurse because they are confounded. This is a <strong>fatal</strong> issue with the design of the study.</p>
 </section>
+</section>
+<section id="example" class="level2">
+<h2 class="anchored" data-anchor-id="example">Example</h2>
+<p>Consider the example where 4 people go on a diet and we measure their weight before the diet, after 1 week, and after 2 weeks. We want to know if the diet is effective in reducing weight.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 4 × 4
+  person before_diet after_diet_wk1 after_diet_wk2
+   &lt;int&gt;       &lt;dbl&gt;          &lt;dbl&gt;          &lt;dbl&gt;
+1      1         102             97             95
+2      2          96             93             87
+3      3          83             79             78
+4      4          79             77             75</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MEM_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Everyone is losing weight, so the diet seems to be effective.</p>
+<p>We want to know if the diet has a (statistically significant) effect on weight loss. We have repeated measures for each person (before diet, after 1 week, after 2 weeks). We know the measurements are not independent because they come from the same person and are likely to be correlated - the value after 1 week is likely similar to the value before diet. This violates the independence assumption of traditional statistical models.</p>
+<p>Lets nievely try to use a simple linear regression model tonalyse this data using a simple linear regression model that ignores the repeated measures:</p>
+<p>The model shows:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="MEM_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>With the results: # A tibble: 2 × 5 term estimate std.error statistic p.value <chr> <dbl> <dbl> <dbl> <dbl> 1 (Intercept) 89.9 4.32 20.8 0.00000000146 2 time_x -3.13 3.35 -0.934 0.372</dbl></dbl></dbl></dbl></chr></p>
+<p>What this gives is <code>p-value</code> of <code>{r tidy(model_lm) |&gt; filter(term == "time_x") |&gt; pull(p.value)}</code> &gt;&gt; 0.05 . In this case, we would <strong>NOT</strong> reject the null hypothesis <span class="math inline">\(H_0\)</span>: slope = 0 and conclude that there is no statistically significant effect of the diet on weigh loss. So by using the wrong model and not accounting for the groups (repeated measures), we have failed to detect a significant effect that is actually present in the data. This is a type II error (false negative) and is a direct consequence of violating the independence assumption.</p>
+<p>Now let’s use a mixed effects model to account for the repeated measures. We treat the subject effects as random effects, which allows us to account for the variability between individuals without having to estimate a separate parameter for each individual (which would be a fixed effect). The model can be specified as follows:</p>
+<p><strong>Note</strong> we are using the lmerTest package instead of lme4 because it provides p-values for the fixed effects, which is what we are interested in here. Douglas Bates, made a deliberate design choice in lme4 <strong>not</strong> to provide p-values for the random effects.</p>
+<p>The <code>(1 | person)</code> syntax specifies a random intercept for each person, allowing us to account for the variability between individuals.</p>
+<p>The model shows:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 2 × 7
+  effect term        estimate std.error statistic    df  p.value
+  &lt;chr&gt;  &lt;chr&gt;          &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;
+1 fixed  (Intercept)    89.9      4.98      18.1   3.05 0.000334
+2 fixed  time_x         -3.12     0.460     -6.79  7.00 0.000256</code></pre>
+</div>
+</div>
+<p>Now, we’re getting somewhere!</p>
+<p>Our <code>p-value</code> for the effect of time is <code>{r tidy_results |&gt; filter(term == "time_x") |&gt; pull(p.value)}</code> &lt;&lt; 0.05 . In this case, we would reject the null hypothesis <span class="math inline">\(H_0\)</span>: slope = 0 and conclude that there is a statistically significant effect of the diet on weight loss. By using the correct model and accounting for the groups (repeated measures), we have correctly detected a significant effect that is present in the data. This is the power of mixed effects models in handling correlated data and avoiding type II errors.</p>
+<p>But note, our plots and esimated effects are the same in both models. The difference is in the statistical inference we can make about the effect of time on weight loss. The mixed effects model allows us to make valid inferences by accounting for the correlation within individuals, while the simple linear regression model does not.</p>
+</section>
+<section id="choice-of-random-effects-models" class="level2">
+<h2 class="anchored" data-anchor-id="choice-of-random-effects-models">Choice of Random Effects Models</h2>
+<p>In the previous example we used a random intercept model, which allows for different baseline weights for each person but assumes that the effect of time is the same across all individuals, which they clearly dont. Different people will experience weight loss at different rates for a multitude of factors. It is possible to use a <strong>random intercept random slope model</strong>. The model can be specified as follows:</p>
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>boundary (singular) fit: see help('isSingular')</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 2 × 7
+  effect term        estimate std.error statistic    df  p.value
+  &lt;chr&gt;  &lt;chr&gt;          &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;
+1 fixed  (Intercept)    89.9      5.42      16.6   3.00 0.000476
+2 fixed  time_x         -3.12     0.572     -5.47  3.28 0.00953 </code></pre>
+</div>
+</div>
+<p>This model allows for both random intercepts and random slopes, meaning that each person can have their own baseline weight and their own rate of weight loss over time. The choice between a random intercept model and a random slope model depends on the research question and the structure of the data. If we are primarily interested in the average effect of time on weight loss across all individuals, a random intercept model may be sufficient. However, if we are interested in understanding how rate of weight loss varies between individuals, a random slope model may be more appropriate. It is important to note that random slope models are more complex and require more data to estimate the additional parameters, so they should be used with caution and only when there is a theoretical justification for their use.</p>
 </section>
 
 </main>

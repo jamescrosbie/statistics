@@ -61,3 +61,155 @@ Could the differences be down to the way different nurses measure blood pressure
 
 **However!** In the later example it is not possible to distinguish between the effect of group and the nurse because they are confounded.  This is a **fatal** issue with the design of the study.  
 
+
+## Example
+
+Consider the example where 4 people go on a diet and we measure their weight before the diet, after 1 week, and after 2 weeks.  We want to know if the diet is effective in reducing weight.
+
+
+```{r}
+#| echo: false
+library(tibble)
+library(ggplot2)
+```
+
+```{r}
+#| echo: false
+df <- tibble(
+    person = rep(1:4),
+    before_diet = c(102, 96, 83, 79),
+    after_diet_wk1 = c(97, 93, 79, 77),
+    after_diet_wk2 = c(95, 87, 78, 75)
+)
+```
+
+```{r}
+#| echo: false
+head(df)
+
+df |> 
+    tidyr::pivot_longer(cols = -person, names_to = "time", values_to = "weight") |>
+    ggplot(
+        aes(
+            x = factor(time, levels = c("before_diet", "after_diet_wk1", "after_diet_wk2")), 
+            y = weight, 
+            group = person, 
+            color = factor(person)
+        )
+    ) +
+    geom_point() +
+    geom_smooth(method='lm', formula= y~x, se = FALSE) +
+    labs(
+        title = "Weight Loss Over Time",
+         x = "Time",
+         y = "Weight (kg)",
+         color = "Person"
+    ) 
+```
+
+Everyone is losing weight, so the diet seems to be effective. 
+
+We want to know if the diet has a (statistically significant) effect on weight loss.  We have repeated measures for each person (before diet, after 1 week, after 2 weeks).  We know the measurements are not independent because they come from the same person and are likely to be correlated - the value after 1 week is likely similar to the value before diet.  This violates the independence assumption of traditional statistical models.
+
+Lets nievely try to use a simple linear regression model tonalyse this data using a simple linear regression model that ignores the repeated measures:
+```{r}
+#| echo: false
+#| warning: false
+library(tidyr)
+library(dplyr)
+library(broom)
+
+df_long <- df |> 
+    tidyr::pivot_longer(cols = -person, names_to = "time", values_to = "weight") |> 
+    dplyr::mutate(time_x = case_when(
+        time == "before_diet" ~ 0,
+        time == "after_diet_wk1" ~ 1,
+        time == "after_diet_wk2" ~ 2
+    ))
+
+model_lm <- lm(weight ~ time_x, data = df_long)
+```
+
+The model shows:
+```{r}
+#| echo: false
+df_long |> 
+    ggplot(
+        aes(
+            x = factor(time, levels = c("before_diet", "after_diet_wk1", "after_diet_wk2")), 
+            y = weight, 
+            group = person, 
+            color = factor(person)
+        )
+    ) +
+    geom_point() +
+    geom_smooth(method='lm', formula= y~x, se = FALSE) +
+    geom_abline(
+        intercept = tidy(model_lm) |> filter(term == "(Intercept)") |> pull(estimate), 
+        slope = tidy(model_lm) |> filter(term == "time_x") |> pull(estimate), 
+        color = "black", linewidth = 1, linetype = "dashed"
+    ) +
+    labs(
+        title = "Weight Loss Over Time",
+         x = "Time",
+         y = "Weight (kg)",
+         color = "Person"
+    ) 
+```
+
+With the results:
+```{r}
+#| echo: false
+#| results: "asis"
+tidy(model_lm)
+```
+
+What this gives is `p-value` of `{r tidy(model_lm) |> filter(term == "time_x") |> pull(p.value)}` >> 0.05 .  In this case, we would **NOT** reject the null hypothesis $H_0$: slope = 0 and conclude that there is no statistically significant effect of the diet on weigh loss.  So by using the wrong model and not accounting for the groups (repeated measures), we have failed to detect a significant effect that is actually present in the data.  This is a type II error (false negative) and is a direct consequence of violating the independence assumption.
+
+Now let's use a mixed effects model to account for the repeated measures.  We treat the subject effects as random effects, which allows us to account for the variability between individuals without having to estimate a separate parameter for each individual (which would be a fixed effect).  The model can be specified as follows:
+
+```{r}
+#| echo: false
+#| warning: false
+library(lmerTest)
+library(broom.mixed)
+
+model_mem <- lmerTest::lmer(weight ~ time_x + (1 | person), data = df_long)
+``` 
+**Note** we are using the lmerTest package instead of lme4 because it provides p-values for the fixed effects, which is what we are interested in here.  Douglas Bates, made a deliberate design choice in lme4 **not** to provide p-values for the random effects.
+
+The `(1 | person)` syntax specifies a random intercept for each person, allowing us to account for the variability between individuals.
+
+
+The model shows:
+```{r}
+#| echo: false
+tidy_results <- broom.mixed::tidy(model_mem, effects = "fixed")
+tidy_results
+```
+
+Now, we're getting somewhere!
+
+Our `p-value` for the effect of time is `{r tidy_results |> filter(term == "time_x") |> pull(p.value)}` << 0.05 .  In this case, we would reject the null hypothesis $H_0$: slope = 0 and conclude that there is a statistically significant effect of the diet on weight loss.  By using the correct model and accounting for the groups (repeated measures), we have correctly detected a significant effect that is present in the data.  This is the power of mixed effects models in handling correlated data and avoiding type II errors.
+
+But note, our plots and esimated effects are the same in both models.  The difference is in the statistical inference we can make about the effect of time on weight loss.  The mixed effects model allows us to make valid inferences by accounting for the correlation within individuals, while the simple linear regression model does not.
+
+## Choice of Random Effects Models
+
+In the previous example we used a random intercept model, which allows for different baseline weights for each person but assumes that the effect of time is the same across all individuals, which they clearly dont.  Different people will experience weight loss at different rates for a multitude of factors.  It is possible to use a **random intercept random slope model**.  The model can be specified as follows:
+
+```{r}
+#| echo: false
+model_mem_random_slope <- lmerTest::lmer(weight ~ time_x + (time_x | person), data = df_long)
+``` 
+```{r}
+#| echo: false
+tidy_results <- broom.mixed::tidy(model_mem_random_slope, effects = "fixed")
+tidy_results
+```
+
+This model allows for both random intercepts and random slopes, meaning that each person can have their own baseline weight and their own rate of weight loss over time.  The choice between a random intercept model and a random slope model depends on the research question and the structure of the data.  If we are primarily interested in the average effect of time on weight loss across all individuals, a random intercept model may be sufficient.  However, if we are interested in understanding how rate of weight loss varies between individuals, a random slope model may be more appropriate.  It is important to note that random slope models are more complex and require more data to estimate the additional parameters, so they should be used with caution and only when there is a theoretical justification for their use.
+
+
+
+
