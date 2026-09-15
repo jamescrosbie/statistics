@@ -395,7 +395,7 @@ term $\epsilon_{ij}$, the simple linear regression model treats all observations
 independent. But **observations from the same person share the same starting point $b_{0i}$, 
 which means they are correlated**. Ignoring this correlation means the model cannot 
 distinguish between between-person variability $\sigma^2_b$ and within-person variability 
-$\sigma^2_e$ - it lumps them together into $\epsilon_{ij}$. This leads to incorrect 
+$\sigma^2_e$ - it lumps them together into $\epsilon_{ij}$ and hence inflates the error (so its less sensitive) and this leads to incorrect 
 standard errors and unreliable hypothesis tests.
 
 
