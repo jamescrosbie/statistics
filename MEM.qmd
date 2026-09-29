@@ -440,7 +440,7 @@ This model allows for both random intercepts and random slopes, meaning that eac
 
 ## Example
 
-The dataset we will use for the example is the Sleepstudy dataset available in the lme4 package.  The research questions behind this dataset are:
+We will use for the example is the Sleepstudy dataset available in the lme4 package.  The research questions behind this dataset are:
 
     1. How does cumulative sleep deprivation affect reaction time, and 
     
@@ -451,6 +451,9 @@ Lets look at the data...
 ```{r}
 #| echo: false
 #| message: false
+#| include: true
+
+
 library(lme4)
 
 data("sleepstudy", package="lme4")
@@ -466,7 +469,7 @@ Here we have 18 Subjects, who have their reaction times measured over 10 days of
 #| 
 df |> ggplot(aes(Days, Reaction, group=Subject, colour=Subject)) +
     geom_point() +
-    geom_smooth(method = "lm", model=y~x, se = FALSE, color = "grey", linetype = "dashed", linewidth = 1, alpha=0.5) +
+    geom_smooth(method = "lm", se = FALSE, color = "grey", linetype = "dashed", linewidth = 1, alpha=0.5) +
     theme_bw() +
     labs(
         title="Sleep deprivation study",
@@ -485,12 +488,11 @@ Looking at that data,
 
 2. Each individual has a different initial (intercept) reaction time.  
 
-Yeah, tell me something I couldn't have guessed James!
 
 
 ### Random Intercept Random Slope
 
-This, to my mind, is the correct model:
+Given the observations, unless we were not interested in the some effects, this, to my mind, is the correct model:
 
 $$
 Reaction_{ij} = (b_{00} + u_{0i} ) + ( b_{10} + u_{1i}) * Days_{ij} + \epsilon_{ij}
@@ -513,6 +515,8 @@ summary(model2)
 ```
 
 That only goes to demonstrate how to write out the models.  Now let's examine what each of the output means.
+
+### Interpretation of output
 
 `Fixed Effects`:
 The average intercept (Reaction time with no sleep-deprivation) across the population is 251.41  
@@ -605,9 +609,6 @@ The random intercepts and slopes are assumed to follow a bivariate normal distri
 •	Bivariate Linearity & Outliers: A scatterplot of random slopes against random intercepts to identify rogue subjects
 driving variance estimates or distorting the correlation parameter ($\hat{\rho} = 0.07$).
 
-
-What to look for in sleepstudy: Subject 308 and Subject 332 often stand out. Subject 308 has an unusually steep rate of performance degradation, while Subject 335 shows negligible degradation (a nearly flat slope).
-
 ```{r}
 #| echo: False
 #| message: False
@@ -653,4 +654,6 @@ plot(infl, which = "cook", cutoff = 4 / length(unique(df$Subject)), xlab = "Cook
 Nested:  Levels of one random effect only occur within one unique level of the higher.  
 Crossed:  All combinations of random effects levels occur together
 
-These is much more complex and serious 
+These is much more complex and serious - Get help!
+
+### The End!
