@@ -313,7 +313,16 @@ Definition of a p-value: The p-value is the probability of observing data as ext
 
 Back in the day we would deal with this using a repeated measures ANOVA, which is a special case of a mixed effects model, which adjusted the `p-value` based on how correlated the data were.  However, the modern approach developed in the 1990s and 2000s is to use a mixed effects model, which allows us to account for the correlation within individuals and provides more accurate estimates of the standard errors, which in turn allows us to correctly detect significant effects.
 
-Now let's use a mixed effects model to account for the repeated measures.  We treat the subject effects as random effects, which allows us to account for the variability between individuals without having to estimate a separate parameter for each individual (which would be a fixed effect).  The model can be specified as follows:
+Now let's use a mixed effects model to account for the repeated measures.  We want to know the overall effectiveness of the diet (fixed effect).  We treat the subject effects as random effects - as we are not actually interested in the individual, which allows us to account for the variability between individuals without having to estimate a separate parameter for each individual (which would be a fixed effect).  The model can be specified as follows:
+
+
+
+::: {.callout-note}
+Before we go any further, we need a quick aside on the R syntax:
+
+The general mixed effect model syntax extends the familiar R fixed effect syntax i.e. `response ~ fixed_effects` by adding random effects `response ~ fixed_effects + (random_effects | grouping_factor)`.  The bar acts as a conditioning operator - what varies on the left across the grouping levels on the right.
+:::
+
 
 ```{r}
 #| echo: false
@@ -427,3 +436,221 @@ tidy_results
 ```
 
 This model allows for both random intercepts and random slopes, meaning that each person can have their own baseline weight and their own rate of weight loss over time.  The choice between a random intercept model and a random slope model depends on the research question and the structure of the data.  If we are primarily interested in the average effect of time on weight loss across all individuals, a random intercept model may be sufficient.  However, if we are interested in understanding how rate of weight loss varies between individuals, a random slope model may be more appropriate.  It is important to note that random slope models are more complex and require more data to estimate the additional parameters, so they should be used with caution and only when there is a theoretical justification for their use.
+
+
+## Example
+
+The dataset we will use for the example is the Sleepstudy dataset available in the lme4 package.  The research questions behind this dataset are:
+
+    1. How does cumulative sleep deprivation affect reaction time, and 
+    
+    2. How does this vary across individuals?  
+    
+Lets look at the data...
+
+```{r}
+#| echo: false
+#| message: false
+library(lme4)
+
+data("sleepstudy", package="lme4")
+df <- dplyr::as_tibble(sleepstudy)
+head(df, 10)
+```
+
+Here we have 18 Subjects, who have their reaction times measured over 10 days of cumulative sleep deprivation.  So lets look at the data :
+
+```{r}
+#| echo: false
+#| message: false
+#| 
+df |> ggplot(aes(Days, Reaction, group=Subject, colour=Subject)) +
+    geom_point() +
+    geom_smooth(method = "lm", model=y~x, se = FALSE, color = "grey", linetype = "dashed", linewidth = 1, alpha=0.5) +
+    theme_bw() +
+    labs(
+        title="Sleep deprivation study",
+        x = "Cumulative Days of Sleep Deprivation",
+        y = "Reaction Times"
+    ) +
+    theme(
+        legend.position="none"
+    )
+
+```
+
+Looking at that data, 
+
+1. Raction times (slope) differ by Subject.
+
+2. Each individual has a different initial (intercept) reaction time.  
+
+Yeah, tell me something I couldn't have guessed James!
+
+
+### Random Intercept Random Slope
+
+This, to my mind, is the correct model:
+
+$$
+Reaction_{ij} = (b_{00} + u_{0i} ) + ( b_{10} + u_{1i}) * Days_{ij} + \epsilon_{ij}
+$$
+
+```{r}
+#| echo: false
+#| message: false
+#| 
+## Explicit
+
+model1 <- lmer(Reaction ~ 1 + Days + ( 1 + Days | Subject), data=df)
+summary(model1)
+
+print("===============================================================")
+
+## Implicit
+model2 <- lmer(Reaction ~ Days + ( Days | Subject), data=df)
+summary(model2)
+```
+
+That only goes to demonstrate how to write out the models.  Now let's examine what each of the output means.
+
+`Fixed Effects`:
+The average intercept (Reaction time with no sleep-deprivation) across the population is 251.41  
+The average slope (Impact on reaction time) is 10.47 per day of sleep deprivation
+
+Simple.
+
+`Random Effects`:
+Intercept - betwwen-subject variability in baseline reaction times.  I.e. An average individual's baseline reaction time fluctuates by +/- 25ms around the population mean.
+Days - between-subject variability in rate of decline.  While the average individual declines at the rate of 10.5ms per day of sleep deprivation this varies by +/- 6ms/day.
+Correlation:  That the subjects speed at day 0 tells us nothing about their speed at the end of the study.
+Residual: That not accounted for by the model.  
+
+
+```{r}
+#| echo: false
+#| message: false
+#| include: false
+
+
+pred <- predict(model1)
+
+df |> ggplot(aes(Days, Reaction, group=Subject, colour=Subject)) +
+    geom_point(alpha = 0.5) +
+    geom_line(
+        aes(y = pred),
+        colour = "steelblue",
+        linewidth = 0.8
+    ) +
+    geom_smooth(method = "lm", se = FALSE, colour = "firebrick", linetype = "dashed", linewidth = 0.6) +
+    # facet_wrap(~ Subject) +
+    theme_bw()+
+    labs(
+        title = "Mixed Model (Blue) vs Independent OLS (Red Dashed)",
+        x = "Days of Sleep Deprivation",
+        y = "Reaction Time (ms)"
+    ) +
+    theme(
+        legend.position = "none"
+    )
+```
+
+
+## Model diagnostics
+
+Diagnosing a linear mixed model requires evaluating assumptions at two distinct levels: 
+
+1. the observation level (within-subject residuals $\epsilon_{ij}$) and 
+
+2. the group level (between-subject random effects $u_i$).
+
+
+
+### 1. Residual Diagnostics (Observation Level: $\epsilon_{ij}$)
+
+The errors are assumed to be independent, identically distributed, and normally distributed: $\epsilon_{ij} \sim \mathcal{N}(0, \sigma^2_\epsilon)$.
+
+•	Fitted vs. Residuals (Homoscedasticity & Linearity): Checks whether residual variance expands over time or as fitted values increase.
+
+•	Quantile-Quantile (Q-Q) Plot (Normality of Errors): Assesses whether heavy tails or skewness violate the normal distribution assumption.
+
+•	Autocorrelation (Temporal Independence): In repeated measures across consecutive days, residuals from Day $t$ may correlate with Day $t-1$ (AR(1) process).
+
+```{r}
+#| echo: False
+#| message: False
+#| include: True
+
+library(ggplot2)
+library(lattice)
+
+pred <- fitted(model1)
+residuals <- resid(model1, type = "pearson")
+
+#Homoscedasticity and Linearity
+plot(model1, type = c("p", "smooth"), xlab = "Fitted Values (ms)", ylab = "Standardised Residuals")
+
+#Q-Q Plot of Residuals
+lattice::qqmath(model1, id = 0.05)
+
+#Temporal Autocorrelation Check (Durbin-Watson or ACF)
+acf(resid(model1), main = "Autocorrelation of Residuals across Days")
+```
+### 2. Random Effects Diagnostics (Group Level: $u_{0i}, u_{1i}$)
+
+The random intercepts and slopes are assumed to follow a bivariate normal distribution: $\mathbf{u}_i \sim \mathcal{N}(\mathbf{0}, \mathbf{\Sigma})$.
+
+•	Normality of Random Effects: Normal Q-Q plots for both $u_{0i}$ (intercepts) and $u_{1i}$ (slopes).
+
+•	Bivariate Linearity & Outliers: A scatterplot of random slopes against random intercepts to identify rogue subjects
+driving variance estimates or distorting the correlation parameter ($\hat{\rho} = 0.07$).
+
+
+What to look for in sleepstudy: Subject 308 and Subject 332 often stand out. Subject 308 has an unusually steep rate of performance degradation, while Subject 335 shows negligible degradation (a nearly flat slope).
+
+```{r}
+#| echo: False
+#| message: False
+#| include: True
+
+ran_df <- as.data.frame(ranef(model1)$Subject)
+
+colnames(ran_df) <- c("Intercept_Dev", "Slope_Dev")
+ran_df |> ggplot(aes(Intercept_Dev, Slope_Dev)) +
+    geom_point(size = 3, colour = "navy") +
+    geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+    theme_bw() +
+    labs(
+        title = "Bivariate Random Effects: Subject Slopes vs Intercepts",
+        x = "Baseline Intercept Offset (ms)",
+        y = "Decline Rate Slope Offset (ms/day)"
+    )
+```
+
+
+### 3. Subject-Level Influence and Leverage
+Individual subjects can exert disproportionate leverage on fixed effects or variance components.  The influence.ME package systematically leaves out one subject at a time to compute Cook's distance and change in parameter estimates ($\Delta \beta$).
+
+```{r}
+#| echo: False
+#| message: False
+#| include: True
+
+library(influence.ME)
+
+# Re-estimate model omitting one subject at a time
+infl <- influence(model1, group = "Subject")
+
+#Cook's distance for fixed effects
+plot(infl, which = "cook", cutoff = 4 / length(unique(df$Subject)), xlab = "Cook's Distance", ylab = "Subject")
+```
+
+
+
+## Nested Random Effects or Crossed Random Effects
+
+Nested:  Levels of one random effect only occur within one unique level of the higher.  
+Crossed:  All combinations of random effects levels occur together
+
+These is much more complex and serious 
