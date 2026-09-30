@@ -27,7 +27,7 @@ Statistical tests normally use an underlying model that describes how dependent/
 $$Strength = \beta_0 + \beta_1 \cdot age + \epsilon$$
 
 Where $\beta_0$ is the intercept, $\beta_1$ is the slope (effect of age on strength), and $\epsilon$ is the error term.  Our model here might be:
-$$Strength \textasciitilde{} N (\beta_0 + \beta_1 \cdot age, \epsilon^2)$$
+$$Strength \sim \mathcal{N} (\beta_0 + \beta_1 \cdot age, \epsilon^2)$$
 
 ![](./img/age-strent-pdf-with-error.jfif)
 
@@ -190,7 +190,7 @@ Could the differences be down to the way different nurses measure blood pressure
 **However!** In the later example it is not possible to distinguish between the effect of group and the nurse because they are confounded.  This is a **fatal** issue with the design of the study.  
 
 
-## Example
+### Example - Weight Loss
 
 Consider the example where 4 people go on a diet and we measure their weight before the diet, after 1 week, and after 2 weeks.  We want to know if the diet is effective in reducing weight.
 
@@ -325,12 +325,14 @@ The general mixed effect model syntax extends the familiar R fixed effect syntax
 
 
 ```{r}
-#| echo: false
+#| echo: true
 #| warning: false
+#| message: true
+
 library(lmerTest)
 library(broom.mixed)
 
-model_mem <- lmerTest::lmer(weight ~ time_x + (1 | person), data = df_long)
+model_mem <- lmerTest::lmer(weight ~ 1+ time_x + (1 | person), data = df_long)
 ``` 
 **Note** we are using the lmerTest package instead of lme4 because it provides p-values for the fixed effects, which is what we are interested in here.  Douglas Bates, made a deliberate design choice in lme4 **not** to provide p-values for the random effects.
 
@@ -426,8 +428,11 @@ $\beta_{1i} = \beta_{1} + u_{1i}$ is the random slope for person $i$, which is m
 
 
 ```{r}
-#| echo: false
-model_mem_random_slope <- lmerTest::lmer(weight ~ time_x + (time_x | person), data = df_long)
+#| echo: true
+#| warning: false
+#| message: true
+
+model_mem_random_slope <- lmerTest::lmer(weight ~ 1 + time_x + (1 + time_x | person), data = df_long)
 ``` 
 ```{r}
 #| echo: false
@@ -438,7 +443,7 @@ tidy_results
 This model allows for both random intercepts and random slopes, meaning that each person can have their own baseline weight and their own rate of weight loss over time.  The choice between a random intercept model and a random slope model depends on the research question and the structure of the data.  If we are primarily interested in the average effect of time on weight loss across all individuals, a random intercept model may be sufficient.  However, if we are interested in understanding how rate of weight loss varies between individuals, a random slope model may be more appropriate.  It is important to note that random slope models are more complex and require more data to estimate the additional parameters, so they should be used with caution and only when there is a theoretical justification for their use.
 
 
-## Example
+### Example  - Sleep Deprivation Study
 
 We will use for the example is the Sleepstudy dataset available in the lme4 package.  The research questions behind this dataset are:
 
@@ -451,8 +456,6 @@ Lets look at the data...
 ```{r}
 #| echo: false
 #| message: false
-#| include: true
-
 
 library(lme4)
 
@@ -464,9 +467,10 @@ head(df, 10)
 Here we have 18 Subjects, who have their reaction times measured over 10 days of cumulative sleep deprivation.  So lets look at the data :
 
 ```{r}
-#| echo: false
-#| message: false
-#| 
+#| echo: true
+#| warning: false
+#| message: true
+
 df |> ggplot(aes(Days, Reaction, group=Subject, colour=Subject)) +
     geom_point() +
     geom_smooth(method = "lm", se = FALSE, color = "grey", linetype = "dashed", linewidth = 1, alpha=0.5) +
@@ -490,7 +494,7 @@ Looking at that data,
 
 
 
-### Random Intercept Random Slope
+#### Random Intercept Random Slope
 
 Given the observations, unless we were not interested in the some effects, this, to my mind, is the correct model:
 
@@ -499,15 +503,20 @@ Reaction_{ij} = (b_{00} + u_{0i} ) + ( b_{10} + u_{1i}) * Days_{ij} + \epsilon_{
 $$
 
 ```{r}
-#| echo: false
-#| message: false
-#| 
-## Explicit
+#| echo: true
+#| warning: false
+#| message: true
 
+
+## Explicit
 model1 <- lmer(Reaction ~ 1 + Days + ( 1 + Days | Subject), data=df)
 summary(model1)
+```
 
-print("===============================================================")
+```{r}
+#| echo: true
+#| warning: false
+#| message: true
 
 ## Implicit
 model2 <- lmer(Reaction ~ Days + ( Days | Subject), data=df)
@@ -532,10 +541,8 @@ Residual: That not accounted for by the model.
 
 
 ```{r}
-#| echo: false
+#| echo: true
 #| message: false
-#| include: false
-
 
 pred <- predict(model1)
 
@@ -560,7 +567,125 @@ df |> ggplot(aes(Days, Reaction, group=Subject, colour=Subject)) +
 ```
 
 
-## Model diagnostics
+## Model Comparisons
+
+Unlike standard regression, mixed models have multiple sources of variance, including residual variance (individual differences from the group mean), intercept variance (group mean differences from the fixed mean), and slope variance (group differences in trends).  
+
+In a simple linear regression there is really only one source of unexplained variability: the residual, $\epsilon_{ij}$, which soaks up everything the fixed effects don't explain.  Once we introduce grouping (e.g. `Subject`), that single bucket of variance gets partitioned into several distinct components, each with its own interpretation:
+
+* **Residual variance ($\sigma^2_\epsilon$)**: the variability left over *within* a subject after accounting for the fixed and random effects - i.e. how much an individual's observations bounce around their own predicted trajectory. This is conceptually the same as OLS residual variance, but it's now only measuring within-subject noise rather than being contaminated by between-subject differences.
+
+* **Intercept variance ($\sigma^2_{u0}$)**: how much subjects' baseline values (their starting point, e.g. reaction time on Day 0) differ from the population average intercept. A large intercept variance means some people simply start higher or lower than others, even before any effect of the fixed predictor kicks in.
+
+* **Slope variance ($\sigma^2_{u1}$)**: how much subjects' *trends* (their rate of change over the predictor) differ from the population average slope. This only exists in a random-slope model - a random-intercept model assumes everyone changes at exactly the same rate, and any deviation from that shared rate is incorrectly absorbed into the residual.
+
+* **Intercept-slope correlation ($\rho$)**: when a random-slope model is fit, we also estimate the correlation between a subject's intercept deviation and their slope deviation. For example, a negative correlation would mean subjects who start higher tend to decline (or improve) faster, pulling them back towards the group over time.
+
+Choosing the wrong random-effects structure doesn't just cost you precision - it actively misattributes variance.  If subjects truly differ in their slopes but we only fit a random intercept, that slope variability doesn't disappear; it gets folded into $\sigma^2_\epsilon$, inflating the residual variance, understating how confident we should be in the fixed effects, and potentially masking a true effect (as we saw with the diet example  and will see below in the sleep study).
+
+Lets suppose we have built 2 models:
+
+* Model 0: Random Intercept Model (Reaction ~ 1 + Days + (1 | Subject))
+
+* Model 1: Random Intercept Random Slope Model (Reaction ~ 1 + Days + (1 + Days | Subject))
+
+```{r}
+#| echo: true
+#| message: false
+
+print("Model 0: Random Intercept Model")
+model0 <- lmer(Reaction ~ 1 + Days + (1 | Subject), data=df)
+summary(model0)
+```
+
+```{r}
+#| echo: true
+#| message: false
+print("Model 1: Random Intercept + Slope Model")
+model1 <- lmer(Reaction ~ 1 + Days + (1 + Days | Subject), data=df)
+summary(model1)
+```
+
+The `summary()` output above does not directly report a percentage of variance explained - which is a standard way of comparing models.  For mixed models this is usually reported as **marginal $R^2$** (variance explained by the fixed effects alone) and **conditional $R^2$** (variance explained by fixed effects *and* random effects together).  These can be computed with `MuMIn::r.squaredGLMM()`.
+
+
+### Comparison Metrics
+```{r}
+#| echo: true
+#| message: false
+#| warning: false
+
+library(MuMIn)
+
+r2_table <- rbind(
+    data.frame(model = "Model 0 (Random Intercept)", r.squaredGLMM(model0)),
+    data.frame(model = "Model 1 (Random Intercept + Slope)", r.squaredGLMM(model1))
+)
+colnames(r2_table) <- c("Model", "Marginal R2 (Fixed)", "Conditional R2 (Fixed + Random)")
+knitr::kable(r2_table, digits = 3)
+```
+
+Both models attribute a similar proportion of variance to the fixed effect of `Days` (marginal $R^2 \approx 0.28$).  The gap between marginal and conditional $R^2$ is much larger for Model 1 (0.28 to 0.80) than Model 0 (0.28 to 0.70), reflecting the fact that allowing subject-specific slopes captures additional between-subject variability that the random-intercept-only model forces into residual error.
+
+$R^2$ tells us how much variance is explained, but it doesn't tell us whether the extra complexity of Model 1 (two more parameters: slope variance and the intercept-slope correlation) is actually **justified** by the data.  For that we need a formal model comparison.  The classic approach is the **Bayesian Information Criterion (BIC)**, alongside its cousin the **Akaike Information Criterion (AIC)** and a **likelihood ratio test (LRT)**.
+
+::: {.callout-note}
+AIC and BIC are both penalised measures of model fit - lower is better (and my preferred method of comparison).  BIC penalises additional parameters more heavily than AIC as sample size grows, so it tends to favour simpler models when the two disagree (and is therefore my preferred way - not just cos its got the word "Bayesian" in it).  Neither has a "significance" cutoff the way a p-value does; they are only meaningful *relative* to another model fit on the same data.
+:::
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+anova_res <- anova(model0, model1)
+anova_res
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+p_val_lrt <- anova_res[["Pr(>Chisq)"]][2] |> scales::pvalue(accuracy = 0.0001)
+```
+
+Both AIC (1802.1 vs 1763.9) and BIC (1814.8 vs 1783.1) are lower for Model 1, favouring the more complex random-slope model even after BIC's heavier complexity penalty is applied.  The likelihood ratio test backs this up: $\chi^2(2) = 42.14$, `r p_val_lrt` << 0.05, so we reject the simpler Model 0 in favour of Model 1.  Allowing for individual varying *rate* of decline, not just their baseline reaction time, gives a significantly better fit - consistent with the spaghetti plot earlier, where subjects clearly had different slopes.
+
+**Note**: `anova()` silently refits both models with maximum likelihood (ML) rather than restricted maximum likelihood (REML) before comparing them, because REML likelihoods are not comparable across models that differ in their random effects structure.
+
+### Bayes Factor
+
+The frequentist LRT tells us whether Model 1 is a *significantly* better fit, but it doesn't tell us the relative strength of evidence for one model over the other - and it can't provide evidence *for* the null (Model 0).  The **Bayes Factor (BF)** addresses this directly: it's the ratio of the marginal likelihood of the data under one model to the marginal likelihood under another, and can be interpreted as "how many times more likely is the data under Model 1 than Model 0".
+
+```{r}
+#| echo: true
+#| message: false
+#| warning: false
+
+library(bayestestR)
+
+bf_models <- bayesfactor_models(model0, model1, denominator = model0)
+bf_models
+```
+
+::: {.callout-note}
+Rules of thumb (Jeffreys, 1961) for interpreting a Bayes Factor of $BF_{10}$ (Model 1 vs Model 0):
+
+| BF~10~ | Evidence for Model 1 |
+|---|---|
+| 1 - 3 | Barely worth mentioning |
+| 3 - 10 | Moderate |
+| 10 - 30 | Strong |
+| 30 - 100 | Very strong |
+| > 100 | Extreme |
+:::
+
+Here $BF_{10} \approx 7.75 \times 10^6$, which is off the end of the Jeffreys scale above - extreme evidence that the data are overwhelmingly more probable under the random-slope model than under the random-intercept-only model.  This reinforces, from a Bayesian perspective, the same conclusion the AIC, BIC, and LRT all point to: Model 1 is the better description of this data.
+
+
+
+## Model Diagnostics
 
 Diagnosing a linear mixed model requires evaluating assumptions at two distinct levels: 
 
@@ -570,7 +695,7 @@ Diagnosing a linear mixed model requires evaluating assumptions at two distinct 
 
 
 
-### 1. Residual Diagnostics (Observation Level: $\epsilon_{ij}$)
+### Residual Diagnostics (Observation Level: $\epsilon_{ij}$)
 
 The errors are assumed to be independent, identically distributed, and normally distributed: $\epsilon_{ij} \sim \mathcal{N}(0, \sigma^2_\epsilon)$.
 
@@ -581,11 +706,9 @@ The errors are assumed to be independent, identically distributed, and normally 
 •	Autocorrelation (Temporal Independence): In repeated measures across consecutive days, residuals from Day $t$ may correlate with Day $t-1$ (AR(1) process).
 
 ```{r}
-#| echo: False
+#| echo: true
 #| message: False
-#| include: True
 
-library(ggplot2)
 library(lattice)
 
 pred <- fitted(model1)
@@ -600,7 +723,9 @@ lattice::qqmath(model1, id = 0.05)
 #Temporal Autocorrelation Check (Durbin-Watson or ACF)
 acf(resid(model1), main = "Autocorrelation of Residuals across Days")
 ```
-### 2. Random Effects Diagnostics (Group Level: $u_{0i}, u_{1i}$)
+
+
+### Random Effects Diagnostics (Group Level: $u_{0i}, u_{1i}$)
 
 The random intercepts and slopes are assumed to follow a bivariate normal distribution: $\mathbf{u}_i \sim \mathcal{N}(\mathbf{0}, \mathbf{\Sigma})$.
 
@@ -610,9 +735,8 @@ The random intercepts and slopes are assumed to follow a bivariate normal distri
 driving variance estimates or distorting the correlation parameter ($\hat{\rho} = 0.07$).
 
 ```{r}
-#| echo: False
+#| echo: true
 #| message: False
-#| include: True
 
 ran_df <- as.data.frame(ranef(model1)$Subject)
 
@@ -630,13 +754,12 @@ ran_df |> ggplot(aes(Intercept_Dev, Slope_Dev)) +
 ```
 
 
-### 3. Subject-Level Influence and Leverage
+### Subject-Level Influence and Leverage
 Individual subjects can exert disproportionate leverage on fixed effects or variance components.  The influence.ME package systematically leaves out one subject at a time to compute Cook's distance and change in parameter estimates ($\Delta \beta$).
 
 ```{r}
-#| echo: False
+#| echo: true
 #| message: False
-#| include: True
 
 library(influence.ME)
 
@@ -656,4 +779,4 @@ Crossed:  All combinations of random effects levels occur together
 
 These is much more complex and serious - Get help!
 
-### The End!
+## The End!
